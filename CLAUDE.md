@@ -8,6 +8,18 @@
 
 ---
 
+## Skills — read the matching one BEFORE starting work in its area
+
+| Skill | Fires when |
+|-------|-----------|
+| `.claude/skills/nec-calc-service/` | Any change to `services/calculations/` or `data/nec/` |
+| `.claude/skills/permit-packet/` | Any change to `services/pdfExport/`, `data/ahj/`, or "the packet PDF looks wrong" |
+| `.claude/skills/packet-verification/` | Before merging any PR that touches PDF output or user-facing flows |
+
+Solved-problem write-ups live in `docs/solutions/` — search there before re-debugging a familiar symptom.
+
+---
+
 ## Commands
 
 `npm install`, `npm run dev` (localhost:3000), `npm run build`, `npm test`. See `package.json` for full script list.
@@ -20,9 +32,11 @@ Before marking any task complete, run these checks in order:
 
 1. **`npm run build`** — Must exit 0 with no errors
 2. **`npm test`** — All tests must pass. Zero failures allowed.
-3. **If a test fails** — Fix the code (not the test), re-run. Do not mark complete with failing tests.
-4. **If you modified a calculation service** — Verify the test file covers your changes. Add tests for new code paths.
-5. **If you added a new route or component** — Verify it's included in the build output (check for the chunk in build log).
+3. **`npx tsc --noEmit`** — Baseline is 0 errors; keep it there. Vite does NOT type-check, so this is the only gate.
+4. **If a test fails** — Fix the code (not the test), re-run. Do not mark complete with failing tests.
+5. **If you modified a calculation service** — Verify the test file covers your changes. Add tests for new code paths.
+6. **If you added a new route or component** — Verify it's included in the build output (check for the chunk in build log).
+7. **If you touched PDF output or a calc that feeds it** — Run the visual pass in `.claude/skills/packet-verification/`. Unit tests do not catch layout or narrative regressions.
 
 **Verify incrementally**: Run build/tests after each significant change, not just at the end. Runtime bugs (DB constraint violations, null crashes, type errors) are cheaper to catch in the step that introduced them.
 
@@ -32,10 +46,13 @@ Before marking any task complete, run these checks in order:
 
 ### NEC 220.87 - Service Upgrade Sizing
 ```
-CRITICAL: 125% multiplier for calculated loads, NOT for measured loads.
-- Measured (utility bill, load study): Use value directly
-- Calculated (panel schedule, manual): Apply 125% multiplier
+CRITICAL: the 1.25× multiplier applies to `manual` (provenance-unknown) values ONLY.
+- Measured (utility_bill, load_study): use value directly — already peak demand
+- Calculated (panel schedule / NEC 220 Part III): use value directly — diversity
+  factors are already in the demand calculation; adding 1.25× double-counts
+- Manual (unknown provenance): apply 1.25× as a defensive default
 ```
+PE-confirmed 2026-05-27 (PR #109). Do NOT "fix" this back to multiplying calculated loads.
 Implementation: `services/calculations/serviceUpgrade.ts`
 
 ### Short Circuit Analysis
@@ -207,6 +224,25 @@ Premium features wrapped in `<FeatureGate feature="feature-name">`. Access tiers
 
 ### Type Adapters
 Database uses snake_case, frontend uses camelCase. Convert via adapters in `lib/typeAdapters.ts`. Don't mix conventions.
+
+---
+
+## Mistake Ledger
+
+Real mistakes made in this repo, each paired with the rule that prevents recurrence. When you make (or the user corrects) a new one, add a row.
+
+| Mistake | Prevention rule |
+|---------|-----------------|
+| Applied 1.25× to calculated loads under NEC 220.87, double-counting Part III diversity | Only `manual` values get 1.25×. See Critical NEC Rules above. (PR #109) |
+| Edited `components/OneLineDiagram.tsx` when the *packet PDF* riser was wrong | Two render paths exist. In-app correct + PDF wrong → the bug is in `services/pdfExport/PermitPacketDocuments.tsx`. |
+| Used 1.732× as the 3-phase impedance multiplier in short circuit | It is 1×. The wrong value underestimates fault current 40–50%. Do not touch `shortCircuit.ts` without a cited IEEE/NEC reason. |
+| "Next size up" table lookup returned the same row it started from | After any `>=` table lookup meant to upsize, assert the result differs from the input row. |
+| Type errors accumulated silently because Vite skips type-checking | `npx tsc --noEmit` is part of the Verification Protocol; baseline stays at 0. |
+| Cost/pricing fields appeared on the permit packet | Procurement data belongs on the Bid PDF only. AHJs never see money. (PR #43) |
+| Hard validation gates blocked contractors from printing draft packets | Validation is advisory: warn, never block. Drafts may print with "TBD". |
+| Chatbot second-guessed a correct domain request (NEMA slot numbering) | Fix is prompt-edits in BOTH the system prompt and the tool param description — not tool code. (PR #69) |
+| Renames left stale brand/name strings in meta tags and landing pages | Grep all casings/spacings/abbreviations before AND after; require zero hits. Check user-facing strings explicitly. |
+| Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
 
