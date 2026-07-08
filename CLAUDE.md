@@ -42,6 +42,19 @@ Before marking any task complete, run these checks in order:
 
 ---
 
+## When Uncertain — Escalation Rules
+
+Exact rules for what to do when the right move isn't clear. Default is to proceed on reversible, in-scope work; these are the exceptions:
+
+1. **NEC interpretation is ambiguous or two readings conflict** → STOP and ask Augusto (he is a FL-licensed PE; his reading is ground truth). Never guess a code interpretation into a calculation or packet — a wrong guess ships on stamped documents.
+2. **The change would touch a Stable Module** (`shortCircuit.ts`, `serviceUpgrade.ts`, `OneLineDiagram.tsx`, `database.types.ts`) **or contradicts a Mistake Ledger row** → surface the conflict and wait; do not silently override a PE-validated decision.
+3. **Destructive or prod-facing action** (migration against prod Supabase `ioarszhzltpisxsxrsgl`, deleting fixtures in `example_reports/`, Stripe config) → confirm first, always.
+4. **Build or tests still failing after 2 fix attempts** → stop thrashing; report exact state, what was tried, and the failing output.
+5. **Scope grows mid-task** — a related bug in the *same* architectural area folds into the open PR; anything else gets filed, not fixed.
+6. **Everything else** (reversible, in-scope, conventional) → proceed and note the judgment call in the PR description.
+
+---
+
 ## Critical NEC Rules
 
 ### NEC 220.87 - Service Upgrade Sizing
