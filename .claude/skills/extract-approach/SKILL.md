@@ -1,13 +1,3 @@
-# extract-approach (ACTIVATED 2026-07-09)
-
-> **Status:** ACTIVE — owner-approved after PR #118 merge. The live skill is
-> `.claude/skills/extract-approach/SKILL.md` and the Learning Law is wired into CLAUDE.md.
-> This file is kept as the provenance record (drafted from the "Do this on your last day
-> with Fable" playbook, Move 5, verified against the full article 2026-07-08).
-
-## The skill (→ `.claude/skills/extract-approach/SKILL.md`)
-
-```markdown
 ---
 name: extract-approach
 description: After solving any non-trivial problem, document the approach so a less capable model can replicate the thinking. Triggers after debugging, architecture decisions, tricky builds, or any solution that took real reasoning.
@@ -48,16 +38,3 @@ Do NOT fire for routine feature work, typo fixes, or anything git history alread
 - The reusable rule must be actionable by a model with zero memory of this session.
 - Name exact files/functions, not descriptions ("the PDF code").
 - Failed hypotheses are half the value — they prune the next search.
-```
-
-## The CLAUDE.md wiring (→ add as a section in CLAUDE.md on activation)
-
-```markdown
-## Learning Law
-
-After every non-trivial solved problem, run the extract-approach skill before moving on.
-A solution without its learnings note is unfinished work.
-```
-
-*Note: destination adapted from the article's `learnings/<date>-<slug>.md` to this repo's
-`docs/solutions/` (INDEX.md already lives there). Everything else follows the article's spec.*

@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-07-07 → 2026-07-09: NEC 220.87(2) measured-demand fix + agent operating manual (PR #118)
+
+**NEC 220.87(2) compliance fix (user-facing, safety-critical)**: Measured maximum demand (`utility_bill` / `load_study`) is now taken **at 125%** when determining existing-service capacity for added loads, per NEC 220.87(2) ("the maximum demand at 125 percent plus the new load" ≤ service rating). Previously all three implementation sites used measured values directly, understating existing load — the unsafe direction: a scenario like measured 120 kVA + 48 kVA new on a 192 kVA service was reported compliant (168 ≤ 192) but is actually 150 + 48 = 198 kVA → 103.1% utilization, upgrade required. Found by Augusto (FL PE) during PR #118 review. Fixed together in `services/calculations/serviceUpgrade.ts` (both `quickServiceCheck` and `analyzeServiceUpgrade`), `services/pdfExport/PermitPacketDocuments.tsx::NEC22087NarrativePage` (the packet page previously printed the correct condition-2 header above math that omitted the factor), and `services/calculations/multiFamilyEV.ts` (PATH A). `ServiceUpgradeWizard` copy unified (it carried labels from two different stale eras). The 2026-05-27 ruling stands: `calculated` (NEC 220 Part III) values flow through with no additional multiplier; `manual` keeps ×1.25 as a defensive default. 4 test assertions updated; 1035 tests passing; visual proofs at `example_reports/NEC22087_Narrative_*_PR118_2026-07-09.pdf`.
+
+**Agent operating manual (internal)**: CLAUDE.md rewritten as an explicit operating manual — Mistake Ledger (11 past mistakes paired with prevention rules), When-Uncertain Escalation Rules, hardened Verification Protocol (`tsc --noEmit` + visual PDF pass), skills index. Three new skills under `.claude/skills/` (`nec-calc-service`, `permit-packet`, `packet-verification`) encode subsystem judgment. New `docs/solutions/` captures one note per solved hard problem; the `extract-approach` skill (activated 2026-07-09 post-merge) writes them automatically per the CLAUDE.md Learning Law.
+
+---
+
 ## 2026-05-23 / 2026-05-24: Post-Sprint-2C panel-PDF demand surfacing + type-baseline + CI gate (PRs #94, #95, #96, #97, #98, #99)
 
 Six PRs over two days close out three independent threads that had been deferred during Sprint 2C: (1) the TypeScript baseline had drifted to 447 errors because Vite's transpile-only build never gated on tsc; (2) panel-schedule PDF pages showed only raw connected-load sums on the Load Summary card, so AHJ reviewers had no NEC-demand reference on the very page they're reviewing for bus rating compliance; (3) the in-app Aggregated Load breakdown (per-load-type NEC 220 factor application) lived nowhere in the printed packet.
