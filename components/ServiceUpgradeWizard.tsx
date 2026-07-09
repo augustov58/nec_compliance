@@ -532,7 +532,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">12-Month Utility Billing</span>
-                    <span className="text-gray-600"> (Actual peak demand - NEC 220.87 Method 1)</span>
+                    <span className="text-gray-600"> (Measured peak × 125% - NEC 220.87(2))</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-2 cursor-pointer">
@@ -545,7 +545,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">30-Day Load Study</span>
-                    <span className="text-gray-600"> (Continuous recording - NEC 220.87 Method 1)</span>
+                    <span className="text-gray-600"> (Measured peak × 125% - NEC 220.87(2))</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-2 cursor-pointer">
@@ -558,7 +558,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">Calculated from Panel Schedule</span>
-                    <span className="text-gray-600"> (125% multiplier applied - NEC 220.87 Method 2)</span>
+                    <span className="text-gray-600"> (NEC 220 Part III demand factors - no additional multiplier)</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-2 cursor-pointer">
@@ -577,14 +577,14 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
               </div>
             </div>
 
-            {/* Warning for calculated loads */}
-            {(existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED ||
-              existingLoadMethod === ExistingLoadDeterminationMethod.MANUAL) && (
+            {/* Warning for manual entries (unknown provenance) */}
+            {existingLoadMethod === ExistingLoadDeterminationMethod.MANUAL && (
               <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2">
                 <AlertTriangle className="w-3 h-3 inline mr-1" />
                 <strong>NEC 220.87 RECOMMENDATION:</strong> For most accurate results, use actual maximum
-                demand from 12-month utility billing or 30-day load study. Calculated loads apply 125%
-                multiplier and may overestimate capacity needs.
+                demand from 12-month utility billing or 30-day load study (taken at 125% per NEC 220.87(2)),
+                or a panel-schedule calculation per NEC 220 Part III. Manual entries apply the 125%
+                multiplier as a defensive default.
               </div>
             )}
 
@@ -900,9 +900,10 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
               {/* Sprint 2C M3 (2026-05-17): Save to Packet 220.87 Narrative.
                   Bridges the wizard → permit packet so commercial users
-                  don't re-enter the same numbers in two places. Method 1
-                  (utility_bill, load_study) skips the 125% multiplier in the
-                  packet renderer; Method 2 (calculated) applies it. */}
+                  don't re-enter the same numbers in two places. Measured
+                  methods (utility_bill, load_study) take the 125% multiplier
+                  per NEC 220.87(2) in the packet renderer; calculated
+                  (NEC 220 Part III) is used directly. */}
               {projectId && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
@@ -912,7 +913,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                         Include in Permit Packet
                       </h4>
                       <p className="text-xs text-gray-600 mb-3">
-                        Persists these inputs to the project's NEC 220.87 narrative — the Permit Packet Generator auto-populates the existing-service narrative page (Method {existingLoadMethod === ExistingLoadDeterminationMethod.UTILITY_BILL || existingLoadMethod === ExistingLoadDeterminationMethod.LOAD_STUDY ? '1: measured demand, no 125% multiplier' : '2: calculated demand × 125%'}).
+                        Persists these inputs to the project's NEC 220.87 narrative — the Permit Packet Generator auto-populates the existing-service narrative page ({existingLoadMethod === ExistingLoadDeterminationMethod.UTILITY_BILL || existingLoadMethod === ExistingLoadDeterminationMethod.LOAD_STUDY ? 'measured demand × 125% per NEC 220.87(2)' : existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED ? 'calculated demand, NEC 220 Part III — no additional multiplier' : 'manual entry × 125% defensive default'}).
                       </p>
                       <button
                         onClick={saveToPacketNarrative}

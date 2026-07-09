@@ -2376,8 +2376,8 @@ const METHOD_LABEL: Record<Exclude<NEC22087Method, 'calculated'>, string> = {
 // misleading to AHJ reviewers). Sprint 3: `calculated` removed from the
 // Record \u2014 it's occupancy-fanned in getNEC22087NarrativeCopy().
 const METHOD_NEC_REF: Record<Exclude<NEC22087Method, 'calculated'>, string> = {
-  utility_bill: 'NEC 220.87 \u2014 actual maximum demand from utility billing',
-  load_study: 'NEC 220.87 \u2014 actual maximum demand from recording load study',
+  utility_bill: 'NEC 220.87 \u2014 actual maximum demand from utility billing, taken at 125% per 220.87(2)',
+  load_study: 'NEC 220.87 \u2014 actual maximum demand from recording load study, taken at 125% per 220.87(2)',
   manual: 'NEC 220.87 (defensive default) \u2014 method unspecified, 125% multiplier applied',
 };
 
@@ -2508,24 +2508,19 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
     data.serviceVoltage,
     data.servicePhase,
   );
-  // Sprint 2 (2026-05-27, follow-up to demand unification): the 125%
-  // multiplier in NEC 220.87 is a safety margin on MEASURED historical
-  // demand — it accounts for the possibility that future peak exceeds
-  // recorded peak. For calculated demand the diversity allowance is
-  // already built into NEC 220 Part III demand factors (220.42/220.84/
-  // etc.), so applying 1.25× on top would double-count. Strict NEC
-  // reading: 220.87 is measured-only; calculated loads use NEC 220
-  // Part III without an additional safety factor. Only 'manual' entries
-  // — where the value's provenance (connected vs. demand) is unknown —
-  // get the 1.25× as a defensive default.
+  // PE correction (2026-07-09, PR #118 review): NEC 220.87(2) requires
+  // "the maximum demand at 125 percent plus the new load" to not exceed
+  // the service rating — the 1.25× applies TO the measured demand
+  // (utility_bill / load_study). The prior code exempted measured values,
+  // which understated existing load AND contradicted the condition-2
+  // header this very page prints. Only 'calculated' (NEC 220 Part III)
+  // skips the multiplier — its demand factors already provide diversity
+  // (Sprint 2 ruling, 2026-05-27, which stands). 'manual' keeps the
+  // 1.25× as a defensive default.
   //
-  // Mirror change at services/calculations/serviceUpgrade.ts:164 — both
+  // Mirror change at services/calculations/serviceUpgrade.ts — both
   // implementations of the rule must stay in sync.
-  const valueIsAlreadyDemandAdjusted =
-    data.method === 'utility_bill'
-    || data.method === 'load_study'
-    || data.method === 'calculated';
-  const adjustedExisting = valueIsAlreadyDemandAdjusted
+  const adjustedExisting = data.method === 'calculated'
     ? data.maxDemandKVA
     : data.maxDemandKVA * 1.25;
   const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA;
@@ -2582,7 +2577,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
           <Text style={themeStyles.summarySub}>
             {`${Math.round(kVAToAmps(data.maxDemandKVA))} A • ${
               data.method === 'utility_bill' || data.method === 'load_study'
-                ? 'measured peak (no add. factor)'
+                ? 'measured peak x 1.25 per 220.87(2)'
                 : data.method === 'calculated'
                   ? 'NEC demand-factored (no add. factor)'
                   : 'manual entry x 1.25'
@@ -2664,7 +2659,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
               {data.method === 'utility_bill' || data.method === 'load_study'
-                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak) x 1.25 = ${adjustedExisting.toFixed(2)} kVA per NEC 220.87(2) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
                 : data.method === 'calculated'
                   ? `${data.maxDemandKVA.toFixed(2)} kVA (existing demand \u2014 NEC 220 Part III demand factors already applied; no additional 125% multiplier) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
                   : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}

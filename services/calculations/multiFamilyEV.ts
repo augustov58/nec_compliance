@@ -250,9 +250,10 @@ export interface MultiFamilyEVInput {
   /**
    * How existing building load is determined per NEC 220.87
    *
-   * - 'calculated': Use NEC 220.84 calculation (125% multiplier applied)
-   * - 'utility_bill': 12-month utility billing data (no multiplier - actual demand)
-   * - 'load_study': 30-day continuous recording (no multiplier - actual demand)
+   * - 'calculated': NEC 220.84 calculation — used directly (demand factors
+   *   already provide diversity; no additional multiplier)
+   * - 'utility_bill': 12-month utility billing data — taken at 125% per NEC 220.87(2)
+   * - 'load_study': 30-day continuous recording — taken at 125% per NEC 220.87(2)
    *
    * Default: 'calculated'
    */
@@ -966,12 +967,15 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // =========================================================================
   // STEP 1: Determine Building Load
   // =========================================================================
-  // Per NEC 220.87:
-  // - 220.87(A): Measurement (utility bill/load study) - use actual demand, NO multiplier
-  // - 220.87(B): Calculation (Article 220.84) - calculate per NEC
+  // Per NEC 220.87 (PE correction 2026-07-09, PR #118 review):
+  // - Measured (utility bill / load study): maximum demand taken AT 125%
+  //   per 220.87(2) — "the maximum demand at 125 percent plus the new load"
+  //   must not exceed the service rating.
+  // - Calculated (NEC 220.84): used directly — demand factors already
+  //   provide the diversity allowance; no additional multiplier.
   //
-  // Using measured data often shows MORE available capacity than calculation,
-  // because actual building usage is typically lower than code-calculated demand.
+  // Even at 125%, measured data often shows MORE available capacity than
+  // calculation, because actual usage is typically lower than code demand.
   // =========================================================================
 
   const breakdown: LoadBreakdownItem[] = [];
@@ -1021,20 +1025,23 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
 
   } else if (useMeasuredData) {
     // =========================================================================
-    // PATH A: MEASURED DATA (NEC 220.87(A))
+    // PATH A: MEASURED DATA (NEC 220.87)
     // =========================================================================
     // Using actual measured demand from utility billing or load study.
-    // NO 125% multiplier - this IS the actual building demand.
+    // Per NEC 220.87(2) the measured maximum demand is taken AT 125% when
+    // determining capacity for added load (PE correction 2026-07-09 —
+    // previously used directly, which understated existing load).
     //
     // Benefits of measurement method:
-    // - Often shows MORE available capacity than calculation
+    // - Even at 125%, often shows MORE available capacity than calculation
     // - Reflects actual usage patterns (vacancy, efficiency, etc.)
     // - Widely accepted by AHJs for service upgrade calculations
     // =========================================================================
 
-    necArticles.push('NEC 220.87(A)');
+    necArticles.push('NEC 220.87');
 
     const measuredDemandVA = measuredPeakDemandKW * 1000;
+    const adjustedMeasuredDemandVA = measuredDemandVA * 1.25;
 
     // Create breakdown entry for measured data
     const methodDescription = existingLoadMethod === 'utility_bill'
@@ -1045,20 +1052,20 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
 
     breakdown.push({
       category: 'Measured Building Demand',
-      description: `${methodDescription}${periodDescription}`,
+      description: `${methodDescription}${periodDescription} × 1.25 per NEC 220.87(2)`,
       connectedVA: measuredDemandVA, // Best estimate - same as measured
-      demandVA: measuredDemandVA,
-      demandFactor: 1.0, // No factor applied - this is actual demand
-      necReference: 'NEC 220.87(A)',
+      demandVA: adjustedMeasuredDemandVA,
+      demandFactor: 1.25, // Measured maximum demand at 125% per NEC 220.87(2)
+      necReference: 'NEC 220.87(2)',
     });
 
     // Set building load values from measured data
     totalConnectedVA = measuredDemandVA; // We don't know connected, use measured
-    buildingDemandVA = measuredDemandVA;
-    buildingDemandFactor = 1.0; // Not applicable for measured data
+    buildingDemandVA = adjustedMeasuredDemandVA;
+    buildingDemandFactor = 1.25; // NEC 220.87(2) — measured demand at 125%
 
     recommendations.push(
-      'Building load based on measured demand (NEC 220.87(A)) - typically shows more available capacity than calculation.'
+      'Building load based on measured demand × 125% (NEC 220.87(2)) - even adjusted, typically shows more available capacity than calculation.'
     );
 
     // Note: Common area loads are INCLUDED in measured demand, don't add separately
