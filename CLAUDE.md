@@ -57,16 +57,20 @@ Exact rules for what to do when the right move isn't clear. Default is to procee
 
 ## Critical NEC Rules
 
-### NEC 220.87 - Service Upgrade Sizing
+### NEC 220.87 - Service Upgrade Sizing (Existing Loads)
 ```
-CRITICAL: the 1.25× multiplier applies to `manual` (provenance-unknown) values ONLY.
-- Measured (utility_bill, load_study): use value directly — already peak demand
+CRITICAL: only `calculated` skips the 1.25× multiplier.
+- Measured (utility_bill, load_study): value × 1.25 — NEC 220.87(2) requires
+  "the maximum demand at 125 percent plus the new load" ≤ service rating
 - Calculated (panel schedule / NEC 220 Part III): use value directly — diversity
-  factors are already in the demand calculation; adding 1.25× double-counts
-- Manual (unknown provenance): apply 1.25× as a defensive default
+  is already in the demand factors; adding 1.25× double-counts
+- Manual (unknown provenance): value × 1.25 as a defensive default
 ```
-PE-confirmed 2026-05-27 (PR #109). Do NOT "fix" this back to multiplying calculated loads.
-Implementation: `services/calculations/serviceUpgrade.ts`
+PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
+(pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).
+Implementation: `services/calculations/serviceUpgrade.ts`, mirrored in
+`services/pdfExport/PermitPacketDocuments.tsx::NEC22087NarrativePage` and
+`services/calculations/multiFamilyEV.ts` — all three must stay in sync.
 
 ### Short Circuit Analysis
 ```
@@ -246,7 +250,8 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 
 | Mistake | Prevention rule |
 |---------|-----------------|
-| Applied 1.25× to calculated loads under NEC 220.87, double-counting Part III diversity | Only `manual` values get 1.25×. See Critical NEC Rules above. (PR #109) |
+| Applied 1.25× to calculated loads under NEC 220.87, double-counting Part III diversity | `calculated` never gets 1.25×. See Critical NEC Rules above. (PR #109) |
+| Exempted measured demand (utility_bill/load_study) from the 220.87 multiplier — understated existing load, the UNSAFE direction | NEC 220.87(2) takes measured max demand at 125%. Only `calculated` skips it. Keep all 3 implementation sites in sync. (PR #118) |
 | Edited `components/OneLineDiagram.tsx` when the *packet PDF* riser was wrong | Two render paths exist. In-app correct + PDF wrong → the bug is in `services/pdfExport/PermitPacketDocuments.tsx`. |
 | Used 1.732× as the 3-phase impedance multiplier in short circuit | It is 1×. The wrong value underestimates fault current 40–50%. Do not touch `shortCircuit.ts` without a cited IEEE/NEC reason. |
 | "Next size up" table lookup returned the same row it started from | After any `>=` table lookup meant to upsize, assert the result differs from the input row. |

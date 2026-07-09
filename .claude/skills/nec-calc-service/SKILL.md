@@ -33,7 +33,7 @@ Electrical calculations here end up on permit documents reviewed by AHJs and sta
 
 ## Domain rules that weaker models get wrong
 
-- **NEC 220.87 (existing load):** the 1.25× multiplier applies to `manual` (provenance-unknown) values ONLY. `utility_bill`, `load_study`, AND `calculated` values are used directly — calculated demand already contains NEC 220 Part III diversity factors; adding 1.25× double-counts. (PE-confirmed 2026-05-27, PR #109. Do not "fix" this back.)
+- **NEC 220.87 (existing load):** only `calculated` skips the 1.25×. Measured demand (`utility_bill`, `load_study`) is taken **at 125%** per NEC 220.87(2) — "the maximum demand at 125 percent plus the new load" must not exceed the service rating. `calculated` (NEC 220 Part III) is used directly: its demand factors already provide diversity, and adding 1.25× double-counts. `manual` gets 1.25× as a defensive default. (PE-confirmed 2026-07-09, PR #118; supersedes both earlier interpretations. Three implementation sites must stay in sync: `serviceUpgrade.ts`, `PermitPacketDocuments.tsx::NEC22087NarrativePage`, `multiFamilyEV.ts`.)
 - **Short circuit (`shortCircuit.ts`):** 3-phase impedance multiplier is **1×, not 1.732×**. The wrong value underestimates fault current 40–50%. IEEE 141 compliant — do not modify without a cited reason.
 - **NEC 220.57 (EVSE):** per-EVSE load = `max(7,200 VA, nameplate)`. It is a floor, NOT a demand factor.
 - **EVEMS (NEC 625.42):** size to the EVEMS *setpoint*, not full connected load — that's the whole point of load management.

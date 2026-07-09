@@ -297,7 +297,12 @@ describe('Service Upgrade (NEC 220.87)', () => {
       expect(result.status).toBe('HIGH'); // >80%
     });
 
-    it('should NOT apply 125% to utility_bill loads (actual measurement)', () => {
+    it('should apply 125% to utility_bill loads per NEC 220.87(2)', () => {
+      // PE correction (2026-07-09, PR #118): NEC 220.87(2) requires "the
+      // maximum demand at 125 percent plus the new load" to not exceed the
+      // service rating — the 1.25× applies TO measured demand. The prior
+      // behavior (measured used directly) understated existing load, the
+      // unsafe direction.
       const input: QuickCheckInput = {
         currentServiceAmps: 200,
         currentUsageAmps: 120,
@@ -305,15 +310,16 @@ describe('Service Upgrade (NEC 220.87)', () => {
         existingLoadMethod: ExistingLoadDeterminationMethod.UTILITY_BILL,
       };
       const result = quickServiceCheck(input);
-      // adjustedExisting = 120A (no multiplier)
-      // total = 120 + 40 = 160A
-      // utilization = 160/200 = 80%
-      expect(result.totalAmps).toBe(160);
-      expect(result.utilizationPercent).toBeCloseTo(80, 0);
+      // adjustedExisting = 120 × 1.25 = 150A
+      // total = 150 + 40 = 190A
+      // utilization = 190/200 = 95%
+      expect(result.totalAmps).toBe(190);
+      expect(result.utilizationPercent).toBeCloseTo(95, 0);
       expect(result.canHandle).toBe(true);
+      expect(result.status).toBe('HIGH');
     });
 
-    it('should NOT apply 125% to load_study loads', () => {
+    it('should apply 125% to load_study loads per NEC 220.87(2)', () => {
       const input: QuickCheckInput = {
         currentServiceAmps: 200,
         currentUsageAmps: 120,
@@ -321,7 +327,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         existingLoadMethod: ExistingLoadDeterminationMethod.LOAD_STUDY,
       };
       const result = quickServiceCheck(input);
-      expect(result.totalAmps).toBe(160);
+      expect(result.totalAmps).toBe(190);
     });
 
     it('should report CRITICAL when load exceeds service', () => {
@@ -391,7 +397,9 @@ describe('Service Upgrade (NEC 220.87)', () => {
       expect(existingRow?.load_kVA).toBe(30);
     });
 
-    it('should skip 125% multiplier for utility_bill method (measured peak)', () => {
+    it('should apply 125% multiplier for utility_bill method per NEC 220.87(2)', () => {
+      // PE correction (2026-07-09, PR #118): measured maximum demand is
+      // taken at 125% when determining capacity for added load.
       const input: ServiceUpgradeInput = {
         currentServiceAmps: 200,
         serviceVoltage: 240,
@@ -401,8 +409,13 @@ describe('Service Upgrade (NEC 220.87)', () => {
         proposedLoads: [],
       };
       const result = analyzeServiceUpgrade(input);
-      // No multiplier → existing demand = 30 kVA
-      expect(result.existingDemand_kVA).toBe(30);
+      // 30 × 1.25 = 37.5 kVA
+      expect(result.existingDemand_kVA).toBe(37.5);
+
+      // The breakdown row must describe the 1.25× operation.
+      const existingRow = result.breakdown.find(b => b.category === 'Existing Load');
+      expect(existingRow?.description).toContain('× 1.25');
+      expect(existingRow?.load_kVA).toBe(37.5);
     });
 
     it('should APPLY 125% multiplier only for manual method (provenance unknown)', () => {
@@ -1076,7 +1089,9 @@ describe('Multi-Family EV (NEC 220.57 / 625.42)', () => {
       expect(result.buildingLoad.buildingDemandVA).toBeLessThan(result.buildingLoad.totalConnectedVA);
     });
 
-    it('should use measured data when existingLoadMethod is utility_bill', () => {
+    it('should use measured data × 1.25 (NEC 220.87(2)) when existingLoadMethod is utility_bill', () => {
+      // PE correction (2026-07-09, PR #118): measured maximum demand is
+      // taken at 125% per NEC 220.87(2), not used directly.
       const input: MultiFamilyEVInput = {
         ...baseInput,
         existingLoadMethod: 'utility_bill',
@@ -1085,8 +1100,8 @@ describe('Multi-Family EV (NEC 220.57 / 625.42)', () => {
       };
       const result = calculateMultiFamilyEV(input);
       expect(result.buildingLoad.loadDeterminationMethod).toBe('utility_bill');
-      expect(result.buildingLoad.buildingDemandVA).toBe(100000); // 100 kW × 1000
-      expect(result.buildingLoad.buildingDemandFactor).toBe(1.0);
+      expect(result.buildingLoad.buildingDemandVA).toBe(125000); // 100 kW × 1000 × 1.25
+      expect(result.buildingLoad.buildingDemandFactor).toBe(1.25);
     });
 
     it('should include phase balance for 3-phase systems', () => {
