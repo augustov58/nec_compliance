@@ -3,7 +3,25 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-24
+**Last Updated**: 2026-07-09
+
+---
+
+### Session: 2026-07-07 → 2026-07-09 — Fable intelligence extraction + NEC 220.87(2) measured-demand fix (PR #118 merged, squash `44ca8bc`)
+
+**Focus**: Applied the "Do this on your last day with Fable" playbook (Machina, X 2026-07-06) in a worktree: rewrote CLAUDE.md as an explicit operating manual (Mistake Ledger, Escalation Rules, hardened Verification Protocol, skills index), wrote 3 subsystem skills (`nec-calc-service`, `permit-packet`, `packet-verification`), and scaffolded `docs/solutions/`. Mid-work, verified the source article against the live rendered X page — the saved Obsidian note contained four fabricated passages from a bogus "X API verbatim" recovery; corrected the note and reconciled the repo artifacts (added the missing Escalation Rules element; aligned the recorder draft to the article's `extract-approach` spec, transcribed from an image embed).
+
+**The big one — NEC 220.87(2) fix (PE review finding)**: During PR review Augusto flagged that measured demand should take the 125% factor. Confirmed against code text: NEC 220.87(2) requires "the maximum demand at 125 percent plus the new load" ≤ service rating. All three implementation sites (`serviceUpgrade.ts` × 2 functions, `PermitPacketDocuments.tsx::NEC22087NarrativePage`, `multiFamilyEV.ts` PATH A) exempted `utility_bill`/`load_study` — understating existing load, the UNSAFE direction (the packet page even printed the correct condition-2 header above math that omitted the factor). Fixed all three + `ServiceUpgradeWizard` copy (which carried labels from two stale eras); the 2026-05-27 ruling stands (`calculated` → direct; `manual` → ×1.25 defensive). 4 tests rewritten to the corrected rule; 1035 passing; tsc clean. Visual proof: rendered the narrative page through the real @react-pdf pipeline — the money case (measured 120 + 48 new on 192 kVA capacity) now correctly FAILS at 103.1% where the old code approved it at "168 ≤ 192". PDFs at `example_reports/NEC22087_Narrative_*_PR118_2026-07-09.pdf`.
+
+**Process lessons**:
+- **The two 220.87 bugs were mirror images with different failure loudness.** Over-applying a factor fails loud (388% utilization gets questioned); under-applying fails silent (packet looks fine, margin isn't there). Direction-of-failure is now recorded in the Mistake Ledger and `docs/solutions/2026-07-09-nec22087-measured-demand-125pct.md`.
+- **"Already solved" ≠ solved.** Sprint 2 settled only the *calculated* half of 220.87; the measured half survived two reviews because the pre-existing code already exempted it. When a value is exempted from a code-mandated factor because it's "already X", verify against the code section's literal text.
+- **Test assertions that only check `blob.size > 0` prove nothing about correctness** — `nec22087NarrativePdf.test.ts` stayed green through the behavior change. Math assertions live in `calculations-extended.test.ts`; render checked visually.
+- **Browser topology**: claude-in-chrome = Augusto's remote browser via Orca IDE (no localhost access to this host); Playwright MCP = local browser for dev servers; e2e auth via user-run `tests/e2e/auth.setup.ts` (env-var credentials, never handled by the agent). Saved to memory as `environment_browser_topology`.
+
+**Post-merge housekeeping (this entry)**: worktree + branches removed; `extract-approach` skill ACTIVATED (`.claude/skills/extract-approach/SKILL.md` + Learning Law in CLAUDE.md); CHANGELOG + SESSION_LOG updated.
+
+**Next steps**: (1) optional in-app e2e pass of the Service Upgrade Wizard once Augusto refreshes the Playwright auth state; (2) the article's remaining runtime workflows on request — consultant audit (repo + business → executable roadmap), second-brain research runs into Obsidian.
 
 ---
 
@@ -54,46 +72,4 @@
 
 ---
 
-### Session: 2026-05-17 — Sprint 2C M3 (Existing/New construction end-to-end across SF / MF / Commercial, PRs #79, #80, #81 stacked)
-
-**Focus**: User opened the session correcting a misread on a previous PR — "PR #78 removed the MF-EV inline form but the analysis still needs to be in the packet; we have a multifamily calculator for that. Make this a bigger UX simplification." They described three end-to-end scenarios the product couldn't express (Existing MF + EV; Existing Commercial + new sub-panel via 220.87 Method 2; Existing Commercial + new loads via 220.87 Method 1 utility bill) and asked me to test E2E + generate proof PDFs. The session evolved through three stacked PRs and two rounds of user-feedback iteration.
-
-**Status**: 3 PRs open against main, stacked:
-- **PR #79** (base `main`) — Tools-Hub-as-source-of-truth MF-EV wiring + Existing/New foundation
-- **PR #80** (base `feat/existing-new-construction-flow`) — equipment-level `is_proposed` (panels)
-- **PR #81** (base `feat/panel-level-is-proposed`) — voltage selector + form persistence + legend polish
-
-Merge order is #79 → #80 → #81. Each subsequent PR auto-rebases to main when its base merges; small chance of manual `git rebase origin/main + git push --force-with-lease` if conflicts.
-
-**Architecture decisions worth carrying forward**:
-
-- **Tools Hub is the source of truth, packet is the consumer.** PR #78's removal-only fix was wrong because it deleted the broken inline duplicate form without restoring the packet's ability to include MF-EV analysis. The correct model is: the Tools Hub calculator does the compute + UI review and persists its full `result` to a known location on `project.settings`. The packet generator reads that location and routes it into `packetData.multiFamilyEVAnalysis`. No reconstruction at the packet site — what the user reviews byte-for-byte is what lands in the PDF. Tests pin the data-shape contract so renames in one site don't silently break the other.
-- **`is_proposed` is the right primitive — apply it at every equipment level.** PR #79 established the circuit-level pattern (`circuits.is_proposed`); PR #80 lifted it to panels. Each level needs: (a) DB column with `DEFAULT false`, (b) UI toggle in the create form that auto-checks when project is existing-construction, (c) renderer differentiation in BOTH the in-app view and the packet PDF, (d) test fixture coverage. The pattern is replicable for transformers / feeders / meter_stacks when a user scenario surfaces them. The MDP carve-out (`is_proposed` always false when `is_main: true`) is a deliberate semantic: in existing-construction projects, the contractor is modifying a service, not replacing the service main.
-- **Shared utility modules beat ad-hoc helpers.** `lib/electricalDisplay.ts` consolidates the L-N voltage formula + system-type ↔ {voltage, phase} mapping + the canonical 3-option SYSTEM_TYPE_OPTIONS. Replaces inline ternaries in PanelSchedule (buggy hardcoded `'120V'`) and the standalone-voltage selector in OneLineDiagram (let users pick 480V single-phase). Future panel/equipment forms have a single import to mirror ProjectSetup's pattern.
-- **Hydrate-then-debounce-persist pattern works for any per-project form state.** PR #79 introduced it for `nec22087Narrative`; PR #81 extended it for `permitPacketDefaults` (preparedBy, contractor license, scope, service type, meter location, conductor routing). 750ms debounce + a `useRef`-tracked `hydratedRef` guard to skip the initial persist. Add a `permitPacketDefaults?: {...}` slot to `ProjectSettings` and copy two `useEffect` blocks; that's the whole pattern. Future form fields should follow this rather than introducing new persistence patterns.
-
-**Process gotchas worth remembering**:
-
-- **Vite's transpile-only build silently ships TypeScript errors.** The inline MF-EV form was passing a stale `MultiFamilyEVInput` shape (`evChargersPerUnit, chargerLevel, commonAreaSqFt` instead of `evChargers: { count, level, ampsPerCharger }, avgUnitSqFt, commonAreaLoadVA`). `tsc --noEmit` flagged it as TS2353 — but `npm run build` (Vite) doesn't run tsc as a step, so the error went un-blocked into production. Future PR worth: add `tsc --noEmit` to the npm scripts or CI so type errors gate the build.
-- **User PDF review is a real bug-finding tool.** Two rounds of user review (commits `98f0cbb` + `82bb3d8` + PR #81) caught 7 real issues that the automated test suite missed: 22100kA AIC label, duplicate "PANEL H1" rows, missing EXIST/NEW in fixture, kVA-only cards, "480V / 120V" hardcoded ternary, lost form fields on reload, dim "*" markers. The fix-cycle was: user names a specific spot in the rendered PDF → I locate the render site by grep → minimal targeted edit → regenerate + send → user verifies or names the next thing. This loop scales much better than trying to anticipate every visual detail upfront. **Send the PDF as a SendUserFile artifact every time** so the user can open it natively rather than scrolling through console output.
-- **Stacked PRs work but require explicit base setting.** `gh pr create --base feat/existing-new-construction-flow` (vs default `main`) is the key flag. Without it, GitHub shows the PR's diff as "everything from both stacked branches combined" which is unreviewable. After the base PR merges, the stacked PR may need `git rebase origin/main` + `gh pr edit --base main` + `git push --force-with-lease`. Worked smoothly for both #80 and #81 since the panel-level + polish work was additive (no rewriting #79's logic). Stacked PRs are best for additive layers; less suited to layered work that might rewrite earlier commits during review.
-- **`is_proposed: false` is the safe migration default but it requires backfill thought.** Adding `is_proposed boolean NOT NULL DEFAULT false` to an existing table is non-destructive: all current rows get `false` (= existing). For brand-new projects in existing-construction mode, the Add Circuit / Add Panel forms auto-flip to TRUE on the next user interaction. The only edge case is "user had a project mid-build before the migration" — those projects keep their (now-canonical-existing) tagging unchanged, which is the right default for in-progress projects where the contractor hasn't yet differentiated. Worth flagging in the migration comment so future maintainers know the default isn't accidental.
-
-**Deliverables**:
-
-| PR | Base | Branch | Files | Result |
-|---|---|---|---|---|
-| **#79** | `main` | `feat/existing-new-construction-flow` | 6 modified + 2 created (993→995 tests) | ⏳ Open against main |
-| **#80** | `#79` | `feat/panel-level-is-proposed` | 5 modified + 1 created migration | ⏳ Open, stacked on #79 |
-| **#81** | `#80` | `feat/voltage-persistence-legend-polish` | 6 modified + 1 created (`lib/electricalDisplay.ts`) | ⏳ Open, stacked on #80 |
-
-**Migration required (manual run in Supabase SQL Editor)**: `supabase/migrations/20260517_panel_is_proposed.sql` — adds `panels.is_proposed boolean NOT NULL DEFAULT false`. JSONB-only extensions to `projects.settings` (no migration) for `permitPacketDefaults`, `nec22087Narrative`, `residential.mfEvCalculation`.
-
-**Proof artifacts in `/home/augusto/Obsidian Notes/Projects/Sparkplan Test Packets/`**:
-- `Permit_Packet_MF_EV_Existing_2026-05-17.pdf` — Scenario 1 (Existing MF + EV)
-- `Permit_Packet_Commercial_Method2_Calculated_2026-05-17.pdf` — Scenario 2 (Commercial + 220.87 calculated × 1.25)
-- `Permit_Packet_Commercial_Method1_UtilityBill_2026-05-17.pdf` — Scenario 3 (Commercial + 220.87 utility bill, no 1.25×)
-
----
-
-<!-- Earlier sessions (2026-05-16 Sprint 2C M2 AHJ expansion PRs #70–#75, 2026-05-15 docs cleanup + JurisdictionRequirements font hotfix + dwelling-load follow-up PRs #63/#64/#65, 2026-05-13 Sprint 2B PR-4 Orlando manifest scaffold + AHJ-aware visibility, 2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Earlier sessions (2026-05-17 Sprint 2C M3 Existing/New construction PRs #79/#80/#81, 2026-05-16 Sprint 2C M2 AHJ expansion PRs #70–#75, 2026-05-15 docs cleanup + JurisdictionRequirements font hotfix + dwelling-load follow-up PRs #63/#64/#65, 2026-05-13 Sprint 2B PR-4 Orlando manifest scaffold + AHJ-aware visibility, 2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->

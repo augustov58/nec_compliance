@@ -1,6 +1,6 @@
 # Solutions Index
 
-One note per hard problem, written by the model that solved it (see [RECORDER.md](./RECORDER.md) — proposed `extract-approach` skill, pending activation).
+One note per hard problem, written by the model that solved it via the `extract-approach` skill (`.claude/skills/extract-approach/SKILL.md`, ACTIVE since 2026-07-09 — provenance in [RECORDER.md](./RECORDER.md)).
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->

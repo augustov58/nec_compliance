@@ -15,8 +15,14 @@
 | `.claude/skills/nec-calc-service/` | Any change to `services/calculations/` or `data/nec/` |
 | `.claude/skills/permit-packet/` | Any change to `services/pdfExport/`, `data/ahj/`, or "the packet PDF looks wrong" |
 | `.claude/skills/packet-verification/` | Before merging any PR that touches PDF output or user-facing flows |
+| `.claude/skills/extract-approach/` | AFTER solving any non-trivial problem (see Learning Law below) |
 
 Solved-problem write-ups live in `docs/solutions/` — search there before re-debugging a familiar symptom.
+
+## Learning Law
+
+After every non-trivial solved problem, run the extract-approach skill before moving on.
+A solution without its learnings note is unfinished work.
 
 ---
 
